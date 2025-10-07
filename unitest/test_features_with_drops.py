@@ -98,10 +98,9 @@ def test_features_with_drops(epochs, extraction_kwargs, ground_truth):
     assert isinstance(features_reduced.columns, pd.MultiIndex)
     epoch_column = ("epoch_id", "")
     assert features_reduced.columns[0] == epoch_column
-    np.testing.assert_array_equal(
-        features_reduced[epoch_column].to_numpy(),
-        np.arange(len(keep_indices), dtype=int),
-    )
+
+    reduced_epoch_ids = features_reduced[epoch_column].to_numpy()
+    assert np.array_equal(reduced_epoch_ids, np.arange(len(keep_indices), dtype=int))
 
     features_str = features_reduced.copy()
     features_str.columns = features_str.columns.map(str)
@@ -114,9 +113,11 @@ def test_features_with_drops(epochs, extraction_kwargs, ground_truth):
     expected = ground_truth.loc[keep_indices, sample_columns].to_numpy()
     actual = features_str.loc[:, sample_columns].to_numpy()
 
-    np.testing.assert_allclose(actual, expected, rtol=1e-9, atol=1e-9)
+    all_match = np.allclose(actual, expected, rtol=1e-9, atol=1e-9)
+    assert all_match, "Features should match ground truth for retained epochs."
 
     target_epoch_ids = np.array([0, 5, 10, 30, 41, 50])
+    mismatched_epochs = []
     for epoch_id in target_epoch_ids:
         assert epoch_id not in drop_indices, "Target epoch unexpectedly dropped."
 
@@ -126,4 +127,7 @@ def test_features_with_drops(epochs, extraction_kwargs, ground_truth):
         actual_row = features_str.loc[matched_pos[0], sample_columns].to_numpy()
         expected_row = ground_truth.loc[epoch_id, sample_columns].to_numpy()
 
-        np.testing.assert_allclose(actual_row, expected_row, rtol=1e-9, atol=1e-9)
+        if not np.allclose(actual_row, expected_row, rtol=1e-9, atol=1e-9):
+            mismatched_epochs.append(epoch_id)
+
+    assert not mismatched_epochs, f"Feature mismatch for epochs: {mismatched_epochs}"

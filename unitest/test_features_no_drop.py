@@ -95,9 +95,9 @@ def test_features_no_drop(epochs, extraction_kwargs, ground_truth):
     assert isinstance(features.columns, pd.MultiIndex)
     epoch_column = ("epoch_id", "")
     assert features.columns[0] == epoch_column
-    np.testing.assert_array_equal(
-        features[epoch_column].to_numpy(), np.arange(len(epochs), dtype=int)
-    )
+
+    epoch_ids = features[epoch_column].to_numpy()
+    assert np.array_equal(epoch_ids, np.arange(len(epochs), dtype=int))
 
     # Compare several representative feature columns with the reference output.
     features_str = features.copy()
@@ -108,9 +108,10 @@ def test_features_no_drop(epochs, extraction_kwargs, ground_truth):
     ]
     sample_columns = feature_columns[:4]
 
-    np.testing.assert_allclose(
+    comparison = np.allclose(
         features_str.loc[:, sample_columns].to_numpy(),
         ground_truth.loc[:, sample_columns].to_numpy(),
         rtol=1e-9,
         atol=1e-9,
     )
+    assert comparison, "Feature values should match the ground truth for sampled columns."
