@@ -201,7 +201,9 @@ def _format_as_dataframe(X, feature_names, separator):
         _idx = [n[len(n.split('__')[0])+2:].replace('__', separator)
                 for n in feature_names]
         columns = pd.MultiIndex.from_arrays([_names, _idx])
-        return pd.DataFrame(data=X, columns=columns)
+        df = pd.DataFrame(data=X, columns=columns)
+        df.insert(0, ('epoch_id', ''), np.arange(len(df), dtype=int))
+        return df
 
 
 def _apply_extractor(extractor, X, ch_names, return_as_df):
@@ -405,9 +407,9 @@ class FeatureExtractor(BaseEstimator, TransformerMixin):
         )
         # to be changed in 0.4 to `__`
         sep = self.separator if self.separator != '' else '_'
-        cols = df.columns
+        cols = df.columns[1:]
         self.feature_names = [
-            f"{cols[i][1]}{sep}{cols[i][0]}" for i in range(df.shape[1])
+            f"{col[1]}{sep}{col[0]}" for col in cols
         ]
         return self
 
