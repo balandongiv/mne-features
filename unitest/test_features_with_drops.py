@@ -2,10 +2,10 @@
 
 from pathlib import Path
 import sys
+import unittest
 
 import numpy as np
 import pandas as pd
-import pytest
 
 import mne
 from sklearn.pipeline import FeatureUnion
@@ -18,7 +18,6 @@ if str(ROOT) not in sys.path:
 from mne_features.feature_extraction import extract_features
 
 
-@pytest.fixture(scope="module", autouse=True)
 def _patch_feature_union():
     """Patch FeatureUnion to support 1D outputs in scikit-learn >= 1.5."""
 
@@ -36,98 +35,120 @@ def _patch_feature_union():
         FeatureUnion._original_hstack = original_hstack
         FeatureUnion._hstack = _hstack
 
-    yield
+
+def _unpatch_feature_union():
+    """Restore the original FeatureUnion._hstack implementation."""
 
     if hasattr(FeatureUnion, "_original_hstack"):
         FeatureUnion._hstack = FeatureUnion._original_hstack
         del FeatureUnion._original_hstack
 
 
-@pytest.fixture(scope="module")
-def epochs():
-    """Load epochs used for the feature extraction tests."""
-
-    data_path = Path(__file__).resolve().parent / "eeg_clean_epo.fif"
-    return mne.read_epochs(data_path, preload=True, verbose="ERROR")
+def setUpModule():  # noqa: N802 - unittest hook
+    _patch_feature_union()
 
 
-@pytest.fixture(scope="module")
-def ground_truth():
-    """Load the reference Parquet file with pre-computed features."""
-
-    path = Path(__file__).resolve().parent / "features_output" / "ground_truth_features.parquet"
-    return pd.read_parquet(path)
+def tearDownModule():  # noqa: N802 - unittest hook
+    _unpatch_feature_union()
 
 
-@pytest.fixture(scope="module")
-def extraction_kwargs(epochs):
-    """Shared keyword arguments for ``extract_features`` calls."""
-
-    freq_bands = {
-        "delta": [0.5, 4.5],
-        "theta": [4.5, 8.5],
-        "alpha": [8.5, 11.5],
-        "sigma": [11.5, 15.5],
-        "beta": [15.5, 30.0],
-    }
-
-    funcs_params = {
-        "pow_freq_bands__normalize": False,
-        "pow_freq_bands__ratios": "all",
-        "pow_freq_bands__psd_method": "fft",
-        "pow_freq_bands__freq_bands": freq_bands,
-    }
-
-    return {
-        "sfreq": epochs.info["sfreq"],
-        "selected_funcs": ["pow_freq_bands"],
-        "funcs_params": funcs_params,
-        "return_as_df": True,
-    }
-
-
-def test_features_with_drops(epochs, extraction_kwargs, ground_truth):
-    """Feature extraction remains consistent after removing epochs."""
+class FeatureExtractionWithDropsTest(unittest.TestCase):
+    """Verify feature extraction parity after removing multiple epochs."""
 
     drop_indices = np.array([2, 4, 17, 40])
-    keep_indices = np.array([idx for idx in range(len(epochs)) if idx not in drop_indices])
-
-    new_epochs = epochs.copy().drop(drop_indices.tolist())
-    features_reduced = extract_features(new_epochs.get_data(), **extraction_kwargs)
-
-    assert isinstance(features_reduced.columns, pd.MultiIndex)
-    epoch_column = ("epoch_id", "")
-    assert features_reduced.columns[0] == epoch_column
-
-    reduced_epoch_ids = features_reduced[epoch_column].to_numpy()
-    assert np.array_equal(reduced_epoch_ids, np.arange(len(keep_indices), dtype=int))
-
-    features_str = features_reduced.copy()
-    features_str.columns = features_str.columns.map(str)
-
-    feature_columns = [
-        col for col in ground_truth.columns if not col.startswith("('epoch_id'")
-    ]
-    sample_columns = feature_columns[:4]
-
-    expected = ground_truth.loc[keep_indices, sample_columns].to_numpy()
-    actual = features_str.loc[:, sample_columns].to_numpy()
-
-    all_match = np.allclose(actual, expected, rtol=1e-9, atol=1e-9)
-    assert all_match, "Features should match ground truth for retained epochs."
-
     target_epoch_ids = np.array([0, 5, 10, 30, 41, 50])
-    mismatched_epochs = []
-    for epoch_id in target_epoch_ids:
-        assert epoch_id not in drop_indices, "Target epoch unexpectedly dropped."
 
-        matched_pos = np.flatnonzero(keep_indices == epoch_id)
-        assert matched_pos.size == 1, "Epoch index mapping should be unique."
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        data_path = Path(__file__).resolve().parent / "eeg_clean_epo.fif"
+        cls.epochs = mne.read_epochs(data_path, preload=True, verbose="ERROR")
 
-        actual_row = features_str.loc[matched_pos[0], sample_columns].to_numpy()
-        expected_row = ground_truth.loc[epoch_id, sample_columns].to_numpy()
+        freq_bands = {
+            "delta": [0.5, 4.5],
+            "theta": [4.5, 8.5],
+            "alpha": [8.5, 11.5],
+            "sigma": [11.5, 15.5],
+            "beta": [15.5, 30.0],
+        }
 
-        if not np.allclose(actual_row, expected_row, rtol=1e-9, atol=1e-9):
-            mismatched_epochs.append(epoch_id)
+        funcs_params = {
+            "pow_freq_bands__normalize": False,
+            "pow_freq_bands__ratios": "all",
+            "pow_freq_bands__psd_method": "fft",
+            "pow_freq_bands__freq_bands": freq_bands,
+        }
 
-    assert not mismatched_epochs, f"Feature mismatch for epochs: {mismatched_epochs}"
+        cls.extraction_kwargs = {
+            "sfreq": cls.epochs.info["sfreq"],
+            "selected_funcs": ["pow_freq_bands"],
+            "funcs_params": funcs_params,
+            "return_as_df": True,
+        }
+
+        gt_path = Path(__file__).resolve().parent / "features_output" / "ground_truth_features.parquet"
+        cls.ground_truth = pd.read_parquet(gt_path)
+
+    def test_features_with_drops(self):
+        """Feature extraction remains consistent after removing epochs."""
+
+        new_epochs = self.epochs.copy().drop(self.drop_indices.tolist())
+        features_reduced = extract_features(
+            new_epochs.get_data(),
+            epoch_ids=new_epochs.selection,
+            **self.extraction_kwargs,
+        )
+
+        self.assertIsInstance(features_reduced.columns, pd.MultiIndex)
+        epoch_column = ("epoch_id", "")
+        self.assertEqual(features_reduced.columns[0], epoch_column)
+
+        reduced_epoch_ids = features_reduced[epoch_column].to_numpy()
+        self.assertTrue(
+            np.array_equal(reduced_epoch_ids, new_epochs.selection),
+            "Epoch identifiers should align with the retained epoch selection.",
+        )
+
+        overlap = np.intersect1d(reduced_epoch_ids, self.drop_indices)
+        self.assertEqual(
+            overlap.size,
+            0,
+            "Dropped epoch identifiers must not appear in the reduced output.",
+        )
+
+        features_str = features_reduced.copy()
+        features_str.columns = features_str.columns.map(str)
+
+        feature_columns = [
+            col for col in self.ground_truth.columns if not col.startswith("('epoch_id'")
+        ]
+        sample_columns = feature_columns[:4]
+
+        expected = self.ground_truth.loc[new_epochs.selection, sample_columns].to_numpy()
+        actual = features_str.loc[:, sample_columns].to_numpy()
+
+        all_match = np.allclose(actual, expected, rtol=1e-9, atol=1e-9)
+        self.assertTrue(all_match, "Features should match ground truth for retained epochs.")
+
+        mismatched_epochs = []
+        for epoch_id in self.target_epoch_ids:
+            if epoch_id in self.drop_indices:
+                continue
+
+            mask = reduced_epoch_ids == epoch_id
+            self.assertTrue(mask.any(), f"Epoch {epoch_id} missing after drops.")
+
+            actual_row = features_str.loc[mask, sample_columns].to_numpy()
+            expected_row = self.ground_truth.loc[[epoch_id], sample_columns].to_numpy()
+
+            if not np.allclose(actual_row, expected_row, rtol=1e-9, atol=1e-9):
+                mismatched_epochs.append(epoch_id)
+
+        self.assertFalse(
+            mismatched_epochs,
+            f"Feature mismatch for epochs: {mismatched_epochs}",
+        )
+
+
+if __name__ == "__main__":  # pragma: no cover - manual execution helper
+    unittest.main()

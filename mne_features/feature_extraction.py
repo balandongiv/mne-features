@@ -169,7 +169,7 @@ class FeatureFunctionTransformer(FunctionTransformer):
         return self
 
 
-def _format_as_dataframe(X, feature_names, separator):
+def _format_as_dataframe(X, feature_names, separator, epoch_ids=None):
     """Format to Pandas DataFrame.
 
     Utility function to format extracted features (X) as a Pandas
@@ -202,7 +202,17 @@ def _format_as_dataframe(X, feature_names, separator):
                 for n in feature_names]
         columns = pd.MultiIndex.from_arrays([_names, _idx])
         df = pd.DataFrame(data=X, columns=columns)
-        df.insert(0, ('epoch_id', ''), np.arange(len(df), dtype=int))
+
+        if epoch_ids is None:
+            epoch_ids = np.arange(len(df), dtype=int)
+        else:
+            epoch_ids = np.asarray(epoch_ids)
+            if epoch_ids.shape[0] != len(df):
+                raise ValueError(
+                    '`epoch_ids` must contain one identifier per epoch.'
+                )
+
+        df.insert(0, ('epoch_id', ''), epoch_ids.astype(int, copy=False))
         return df
 
 
@@ -445,7 +455,7 @@ class FeatureExtractor(BaseEstimator, TransformerMixin):
 
 
 def extract_features(X, sfreq, selected_funcs, funcs_params=None, n_jobs=1,
-                     ch_names=None, return_as_df=False, separator=''):
+                     ch_names=None, return_as_df=False, separator='', epoch_ids=None):
     """Extraction of temporal or spectral features from epoched EEG signals.
 
     Parameters
@@ -499,6 +509,11 @@ def extract_features(X, sfreq, selected_funcs, funcs_params=None, n_jobs=1,
         .. versionchanged:: 0.4
             The default changed from `_` to `__`.
 
+    epoch_ids : array-like of shape (n_epochs,) or None
+        Optional identifier for each epoch. When ``return_as_df`` is True, the
+        identifiers populate the leading ``epoch_id`` column of the returned
+        DataFrame. If None, a zero-based index is generated.
+
     Returns
     -------
     array-like, shape (n_epochs, n_features)
@@ -533,6 +548,6 @@ def extract_features(X, sfreq, selected_funcs, funcs_params=None, n_jobs=1,
     res = list(zip(*res))[0]
     Xnew = np.vstack(res)
     if return_as_df:
-        return _format_as_dataframe(Xnew, feature_names, separator)
+        return _format_as_dataframe(Xnew, feature_names, separator, epoch_ids)
     else:
         return Xnew
