@@ -17,14 +17,31 @@ follow each step comfortably.
 
 from __future__ import annotations
 
+from ast import literal_eval
 from pathlib import Path
+import sys
+from contextlib import contextmanager
+import warnings
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+warnings.filterwarnings(
+    "ignore",
+    message="invalid value encountered in divide",
+    category=RuntimeWarning,
+    module="mne_features.univariate",
+)
 
 import mne
 import pandas as pd
+from pandas.testing import assert_frame_equal
+from sklearn.pipeline import FeatureUnion
 
 from mne_features.feature_extraction import extract_features
 
-DATA_DIR = Path(__file__).resolve().parents[1] / "unitest"
+DATA_DIR = REPO_ROOT / "unitest"
 EPOCHS_PATH = DATA_DIR / "eeg_clean_epo.fif"
 GROUND_TRUTH_PATH = DATA_DIR / "features_output" / "ground_truth_features.parquet"
 
@@ -44,6 +61,51 @@ FUNCS_PARAMS = {
 DROPPED_EPOCHS = [2, 4, 17, 40]
 
 
+@contextmanager
+def _patched_feature_union():
+    """Convert 1D outputs from ``FeatureUnion`` transformers into row vectors."""
+
+    original_hstack = FeatureUnion._hstack
+
+    def _safe_hstack(self, matrices):
+        reshaped = [
+            matrix.reshape(1, -1)
+            if getattr(matrix, "ndim", 0) == 1
+            else matrix
+            for matrix in matrices
+        ]
+        return original_hstack(self, reshaped)
+
+    FeatureUnion._hstack = _safe_hstack
+    try:
+        yield
+    finally:
+        FeatureUnion._hstack = original_hstack
+
+
+def _ensure_multiindex(df: pd.DataFrame) -> pd.DataFrame:
+    """Return ``df`` with a simple two-level column :class:`pandas.MultiIndex`."""
+
+    if isinstance(df.columns, pd.MultiIndex):
+        return df
+
+    def _normalise(column):
+        if isinstance(column, tuple):
+            return column
+        if isinstance(column, str):
+            try:
+                parsed = literal_eval(column)
+            except (ValueError, SyntaxError):
+                parsed = None
+            if isinstance(parsed, tuple):
+                return parsed
+        return (column, "")
+
+    result = df.copy()
+    result.columns = pd.MultiIndex.from_tuples([_normalise(col) for col in df.columns])
+    return result
+
+
 def main() -> None:
     """Execute the drop workflow and print a quick validation summary."""
 
@@ -57,18 +119,16 @@ def main() -> None:
     # ------------------------------------------------------------------
     # 2. Extract the features and append the preserved ``epoch_id`` column.
     # ------------------------------------------------------------------
-    features_df = extract_features(
-        epochs.get_data(),
-        epochs.info["sfreq"],
-        selected_funcs=["pow_freq_bands"],
-        return_as_df=True,
-        funcs_params=FUNCS_PARAMS,
-    ).copy()
+    with _patched_feature_union():
+        features_df = extract_features(
+            epochs.get_data(),
+            epochs.info["sfreq"],
+            selected_funcs=["pow_freq_bands"],
+            return_as_df=True,
+            funcs_params=FUNCS_PARAMS,
+        ).copy()
 
-    if not isinstance(features_df.columns, pd.MultiIndex):
-        features_df.columns = pd.MultiIndex.from_tuples(
-            [col if isinstance(col, tuple) else (col, "") for col in features_df.columns]
-        )
+    features_df = _ensure_multiindex(features_df)
 
     features_df.insert(0, ("epoch_id", ""), epoch_ids)
 
@@ -76,17 +136,14 @@ def main() -> None:
     # 3. Align the freshly extracted features with the stored ground truth and
     #    verify that the remaining epochs still match perfectly.
     # ------------------------------------------------------------------
-    ground_truth_df = pd.read_parquet(GROUND_TRUTH_PATH, engine="pyarrow")
-    if not isinstance(ground_truth_df.columns, pd.MultiIndex):
-        ground_truth_df.columns = pd.MultiIndex.from_tuples(
-            [
-                col if isinstance(col, tuple) else (col, "")
-                for col in ground_truth_df.columns
-            ]
-        )
+    ground_truth_df = _ensure_multiindex(
+        pd.read_parquet(GROUND_TRUTH_PATH, engine="pyarrow")
+    )
 
     extracted_indexed = features_df.set_index(("epoch_id", ""))
     ground_truth_indexed = ground_truth_df.set_index(("epoch_id", ""))
+    extracted_indexed.index.name = "epoch_id"
+    ground_truth_indexed.index.name = "epoch_id"
 
     expected_epochs = [0, 5, 10, 30, 41, 50]
     shared_columns = [
@@ -97,12 +154,21 @@ def main() -> None:
     extracted_slice = extracted_indexed.loc[expected_epochs, comparison_columns]
     baseline_slice = ground_truth_indexed.loc[expected_epochs, comparison_columns]
 
-    if extracted_slice.equals(baseline_slice):
-        print("✅ Dropped-epoch features still match the ground truth selection.")
-    else:
+    try:
+        assert_frame_equal(
+            extracted_slice,
+            baseline_slice,
+            check_exact=False,
+            rtol=1e-12,
+            atol=0.0,
+        )
+    except AssertionError as error:
         print("❌ Differences detected! Check the tables for details.")
+        print(error)
         print("Extracted slice:\n", extracted_slice)
         print("Baseline slice:\n", baseline_slice)
+    else:
+        print("✅ Dropped-epoch features still match the ground truth selection.")
 
     missing_epochs = set(DROPPED_EPOCHS).intersection(extracted_indexed.index)
     if missing_epochs:
