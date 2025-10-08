@@ -16,10 +16,8 @@ this script as a starting point for your own experiments.
 
 from __future__ import annotations
 
-from ast import literal_eval
 from pathlib import Path
 import sys
-from contextlib import contextmanager
 import warnings
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -36,9 +34,9 @@ warnings.filterwarnings(
 import mne
 import pandas as pd
 from pandas.testing import assert_frame_equal
-from sklearn.pipeline import FeatureUnion
 
 from mne_features.feature_extraction import extract_features
+from unitest.utils import ensure_multiindex, patched_feature_union
 
 # ---------------------------------------------------------------------------
 # Locate the shared dataset and regression baseline files that live alongside
@@ -66,51 +64,6 @@ FUNCS_PARAMS = {
 }
 
 
-@contextmanager
-def _patched_feature_union():
-    """Convert 1D outputs from ``FeatureUnion`` transformers into row vectors."""
-
-    original_hstack = FeatureUnion._hstack
-
-    def _safe_hstack(self, matrices):
-        reshaped = [
-            matrix.reshape(1, -1)
-            if getattr(matrix, "ndim", 0) == 1
-            else matrix
-            for matrix in matrices
-        ]
-        return original_hstack(self, reshaped)
-
-    FeatureUnion._hstack = _safe_hstack
-    try:
-        yield
-    finally:
-        FeatureUnion._hstack = original_hstack
-
-
-def _ensure_multiindex(df: pd.DataFrame) -> pd.DataFrame:
-    """Return ``df`` with a simple two-level column :class:`pandas.MultiIndex`."""
-
-    if isinstance(df.columns, pd.MultiIndex):
-        return df
-
-    def _normalise(column):
-        if isinstance(column, tuple):
-            return column
-        if isinstance(column, str):
-            try:
-                parsed = literal_eval(column)
-            except (ValueError, SyntaxError):
-                parsed = None
-            if isinstance(parsed, tuple):
-                return parsed
-        return (column, "")
-
-    result = df.copy()
-    result.columns = pd.MultiIndex.from_tuples([_normalise(col) for col in df.columns])
-    return result
-
-
 
 def main() -> None:
     """Run the end-to-end extraction pipeline and compare it to the baseline."""
@@ -128,7 +81,7 @@ def main() -> None:
     #    result so that inserting ``epoch_id`` does not mutate the object that
     #    ``extract_features`` returned.
     # ------------------------------------------------------------------
-    with _patched_feature_union():
+    with patched_feature_union():
         features_df = extract_features(
             epochs.get_data(),
             epochs.info["sfreq"],
@@ -139,7 +92,7 @@ def main() -> None:
 
     # Ensure the feature names use a two-level MultiIndex so we can insert the
     # identifier column while keeping a consistent layout.
-    features_df = _ensure_multiindex(features_df)
+    features_df = ensure_multiindex(features_df)
 
     features_df.insert(0, ("epoch_id", ""), epoch_ids)
 
@@ -147,7 +100,7 @@ def main() -> None:
     # 3. Load the ground-truth DataFrame and align both tables by ``epoch_id``
     #    so we can perform an easy equality check on a few rows.
     # ------------------------------------------------------------------
-    ground_truth_df = _ensure_multiindex(
+    ground_truth_df = ensure_multiindex(
         pd.read_parquet(GROUND_TRUTH_PATH, engine="pyarrow")
     )
 
