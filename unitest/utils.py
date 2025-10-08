@@ -30,26 +30,10 @@ DATA_DIR = Path(__file__).resolve().parent
 EPOCHS_PATH = DATA_DIR / "eeg_clean_epo.fif"
 GROUND_TRUTH_PATH = DATA_DIR / "features_output" / "ground_truth_features.parquet"
 
-FREQ_BANDS = {
-    "delta": [0.5, 4.5],
-    "theta": [4.5, 8.5],
-    "alpha": [8.5, 11.5],
-    "sigma": [11.5, 15.5],
-    "beta": [15.5, 30.0],
-}
-
-FUNCS_PARAMS = {
-    "pow_freq_bands__normalize": False,
-    "pow_freq_bands__ratios": "all",
-    "pow_freq_bands__psd_method": "fft",
-    "pow_freq_bands__freq_bands": FREQ_BANDS,
-}
-
 __all__ = [
     "DATA_DIR",
     "EPOCHS_PATH",
     "GROUND_TRUTH_PATH",
-    "FUNCS_PARAMS",
     "ensure_multiindex",
     "patched_feature_union",
 ]
