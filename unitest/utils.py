@@ -1,9 +1,11 @@
-"""Utility helpers used across the feature regression tests.
+"""Helper functions that exist exclusively to support the regression tests.
 
-The goal of this module is to hide the mechanics of loading data and running
-``extract_features`` so that each unit test can focus solely on its
-assertions.  The helpers intentionally keep a very small surface area and
-avoid any heavy abstractions that would make the tests harder to follow.
+This module intentionally exposes only the minimal set of helpers the tests
+need.  They centralise the mechanics for loading data, running
+``extract_features`` and normalising the resulting tables so that the test
+files themselves can remain compact and assertion focused.  If more helpers are
+required for unit tests in the future they should be added here, but utilities
+for tutorials or examples belong alongside those scripts instead.
 """
 
 from __future__ import annotations
@@ -25,6 +27,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from mne_features.feature_extraction import extract_features  # noqa: E402
+
+__all__ = [
+    "extract_feature_dataframe",
+    "load_ground_truth_df",
+    "load_epochs",
+    "to_epoch_indexed",
+]
 
 # ---------------------------------------------------------------------------
 # Paths and parameters shared across the tests
