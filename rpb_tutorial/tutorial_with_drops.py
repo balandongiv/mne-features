@@ -169,6 +169,8 @@ def main() -> None:
         print("Baseline slice:\n", baseline_slice)
     else:
         print("✅ Dropped-epoch features still match the ground truth selection.")
+        print("Extracted slice:\n", extracted_slice)
+        print("Ground-truth slice:\n", baseline_slice)
 
     missing_epochs = set(DROPPED_EPOCHS).intersection(extracted_indexed.index)
     if missing_epochs:

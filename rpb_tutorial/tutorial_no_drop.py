@@ -186,6 +186,8 @@ def main() -> None:
         print("Baseline slice:\n", baseline_slice)
     else:
         print("✅ Extracted features match the ground truth for the selected epochs.")
+        print("Extracted slice:\n", extracted_slice)
+        print("Ground-truth slice:\n", baseline_slice)
 
 
 if __name__ == "__main__":
