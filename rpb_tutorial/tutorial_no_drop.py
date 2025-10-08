@@ -162,7 +162,7 @@ def main() -> None:
     #    baseline.  If the comparison succeeds we print a friendly message for
     #    the reader.
     # ------------------------------------------------------------------
-    epoch_subset = [0, 5, 10, 30, 41, 50]
+    epoch_subset = [0, 1, 2, 3, 5, 10, 20, 21, 22, 30, 41, 48, 49, 50]
     shared_columns = [
         col for col in extracted_indexed.columns if col in ground_truth_indexed.columns
     ]
