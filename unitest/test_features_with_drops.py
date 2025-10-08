@@ -3,20 +3,20 @@ import unittest
 import pyarrow  # noqa: F401
 from pandas.testing import assert_frame_equal
 
-from unitest import utils
+from unitest import test_utils
 
 
 class TestFeatureExtractionWithDrops(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.dropped_indices = [2, 4, 17, 40]
-        base_epochs = utils.load_epochs()
+        base_epochs = test_utils.load_epochs()
         epochs_with_drops = base_epochs.copy()
         epochs_with_drops.drop(cls.dropped_indices)
-        cls.features = utils.extract_feature_dataframe(epochs_with_drops)
-        cls.ground_truth = utils.load_ground_truth_df()
-        cls.features_indexed = utils.to_epoch_indexed(cls.features)
-        cls.ground_truth_indexed = utils.to_epoch_indexed(cls.ground_truth)
+        cls.features = test_utils.extract_feature_dataframe(epochs_with_drops)
+        cls.ground_truth = test_utils.load_ground_truth_df()
+        cls.features_indexed = test_utils.to_epoch_indexed(cls.features)
+        cls.ground_truth_indexed = test_utils.to_epoch_indexed(cls.ground_truth)
         cls.expected_epoch_ids = [0, 5, 10, 30, 41, 50]
 
     def test_dataframe_integrity_after_drops(self):
