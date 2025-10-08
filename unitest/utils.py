@@ -78,7 +78,16 @@ def patched_feature_union():
 
 
 def ensure_multiindex(df: pd.DataFrame) -> pd.DataFrame:
-    """Return ``df`` with a simple two-level column :class:`~pandas.MultiIndex`."""
+    """Return ``df`` with a simple two-level column :class:`~pandas.MultiIndex`.
+
+    The regression tests and tutorials both need feature tables whose columns
+    behave like the objects that :mod:`mne_features` ordinarily emits.  Some
+    extraction paths flatten the MultiIndex into plain strings (for example
+    when results are saved to disk and reloaded), so this helper restores the
+    structured column layout in a way that is safe for any caller that expects
+    the canonical two-level shape.  Keeping the utility here ensures the
+    behaviour is shared consistently across tests and user-facing examples.
+    """
 
     if isinstance(df.columns, pd.MultiIndex):
         return df
