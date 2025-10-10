@@ -3,7 +3,7 @@ import unittest
 import pyarrow  # noqa: F401
 from pandas.testing import assert_frame_equal
 
-from unitest import test_utils
+from unitest import utils_test_helpers as test_utils
 
 
 class TestFeatureExtractionNoDrop(unittest.TestCase):

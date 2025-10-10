@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ast import literal_eval
 from pathlib import Path
 
 import mne
@@ -9,36 +10,54 @@ import pandas as pd
 
 from mne_features.feature_extraction import extract_features
 
-from .utils import ensure_multiindex, patched_feature_union
+from .constants import FUNCS_PARAMS
+from .utils import patched_feature_union
 
 DATA_DIR = Path(__file__).resolve().parent
 EPOCHS_PATH = DATA_DIR / "eeg_clean_epo.fif"
 GROUND_TRUTH_PATH = DATA_DIR / "features_output" / "ground_truth_features.parquet"
 
-FREQ_BANDS = {
-    "delta": [0.5, 4.5],
-    "theta": [4.5, 8.5],
-    "alpha": [8.5, 11.5],
-    "sigma": [11.5, 15.5],
-    "beta": [15.5, 30.0],
-}
-
-FUNCS_PARAMS = {
-    "pow_freq_bands__normalize": False,
-    "pow_freq_bands__ratios": "all",
-    "pow_freq_bands__psd_method": "fft",
-    "pow_freq_bands__freq_bands": FREQ_BANDS,
-}
-
 __all__ = [
     "DATA_DIR",
     "EPOCHS_PATH",
     "GROUND_TRUTH_PATH",
+    "ensure_multiindex",
     "extract_feature_dataframe",
     "load_ground_truth_df",
     "load_epochs",
     "to_epoch_indexed",
 ]
+
+
+def ensure_multiindex(df: pd.DataFrame) -> pd.DataFrame:
+    """Return ``df`` with a simple two-level column :class:`~pandas.MultiIndex`.
+
+    The regression tests and tutorials both need feature tables whose columns
+    behave like the objects that :mod:`mne_features` ordinarily emits.  Some
+    extraction paths flatten the MultiIndex into plain strings (for example
+    when results are saved to disk and reloaded), so this helper restores the
+    structured column layout in a way that is safe for any caller that expects
+    the canonical two-level shape.
+    """
+
+    if isinstance(df.columns, pd.MultiIndex):
+        return df
+
+    def _normalise(column):
+        if isinstance(column, tuple):
+            return column
+        if isinstance(column, str):
+            try:
+                parsed = literal_eval(column)
+            except (ValueError, SyntaxError):
+                parsed = None
+            if isinstance(parsed, tuple):
+                return parsed
+        return (column, "")
+
+    result = df.copy()
+    result.columns = pd.MultiIndex.from_tuples([_normalise(col) for col in df.columns])
+    return result
 
 
 def extract_feature_dataframe(epochs: mne.Epochs) -> pd.DataFrame:
