@@ -36,7 +36,8 @@ import pandas as pd
 from pandas.testing import assert_frame_equal
 
 from mne_features.feature_extraction import extract_features
-from unitest.utils import ensure_multiindex, patched_feature_union
+from unitest.test_utils import ensure_multiindex
+from unitest.utils import patched_feature_union
 
 # ---------------------------------------------------------------------------
 # Locate the shared dataset and regression baseline files that live alongside

@@ -37,7 +37,8 @@ import pandas as pd
 from pandas.testing import assert_frame_equal
 
 from mne_features.feature_extraction import extract_features
-from unitest.utils import ensure_multiindex, patched_feature_union
+from unitest.test_utils import ensure_multiindex
+from unitest.utils import patched_feature_union
 
 DATA_DIR = REPO_ROOT / "unitest"
 EPOCHS_PATH = DATA_DIR / "eeg_clean_epo.fif"
