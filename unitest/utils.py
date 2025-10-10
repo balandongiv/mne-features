@@ -3,8 +3,8 @@
 This module deliberately exposes only the small collection of utilities that
 both the regression unit tests and the tutorial scripts rely on.  Dataset
 paths, frequency-band configuration, and other test-specific details now live
-in :mod:`unitest.test_utils` so the public helpers here remain lightweight and
-generally applicable.
+in :mod:`unitest.utils_test_helpers` so the public helpers here remain
+lightweight and generally applicable.
 """
 
 from __future__ import annotations

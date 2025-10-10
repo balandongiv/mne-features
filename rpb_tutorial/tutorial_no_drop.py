@@ -37,7 +37,7 @@ from pandas.testing import assert_frame_equal
 
 from mne_features.feature_extraction import extract_features
 from unitest.constants import FREQ_BANDS, FUNCS_PARAMS
-from unitest.test_utils import ensure_multiindex
+from unitest.utils_test_helpers import ensure_multiindex
 from unitest.utils import patched_feature_union
 
 # ---------------------------------------------------------------------------
