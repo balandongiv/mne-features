@@ -10,7 +10,7 @@ dependencies:
 - matplotlib
 - numba
 - pandas
-- scikit-learn
+- scikit-learn>=1.6
 - PyWavelets
 - tqdm
 - download

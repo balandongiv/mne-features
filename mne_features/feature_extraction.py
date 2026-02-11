@@ -17,6 +17,7 @@ except (ImportError, ModuleNotFoundError):
     import joblib
 from sklearn.pipeline import FeatureUnion
 from sklearn.preprocessing import FunctionTransformer
+from sklearn.utils.validation import validate_data
 
 from .bivariate import get_bivariate_funcs, get_bivariate_func_names
 from .univariate import get_univariate_funcs, get_univariate_func_names
@@ -103,7 +104,13 @@ class FeatureFunctionTransformer(FunctionTransformer):
         -------
         self
         """
-        self._check_input(X, reset=True)
+        validate_data(
+            self,
+            X,
+            reset=True,
+            accept_sparse=self.accept_sparse,
+            skip_check_array=not self.validate,
+        )
         _feature_func = _get_python_func(self.func)
         if hasattr(_feature_func, 'get_feature_names'):
             _params = self.get_params()

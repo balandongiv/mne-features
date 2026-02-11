@@ -306,7 +306,7 @@ def test_feature_names_quantile():
     df = extract_features(
         _data, sfreq, selected_funcs, funcs_params={'quantile__q': q},
         return_as_df=True)
-    assert_equal(df.columns.get_level_values(1).values, col_names)
+    assert_equal(df.columns.get_level_values(1).to_list(), col_names)
 
 
 def test_feature_names_spect_edge_freq():
@@ -325,7 +325,7 @@ def test_feature_names_spect_edge_freq():
             _data, sfreq, selected_funcs,
             funcs_params={'spect_edge_freq__edge': edge},
             return_as_df=True)
-        assert_equal(df.columns.get_level_values(1).values, col_names)
+        assert_equal(df.columns.get_level_values(1).to_list(), col_names)
 
 
 def test_feature_names_spect_slope():
@@ -338,7 +338,7 @@ def test_feature_names_spect_slope():
     col_names = ['ch%s_%s' % (ch, stat) for ch in range(n_chans) for
                  stat in stats]
     df = extract_features(_data, sfreq, selected_funcs, return_as_df=True)
-    assert_equal(df.columns.get_level_values(1).values, col_names)
+    assert_equal(df.columns.get_level_values(1).to_list(), col_names)
 
 
 def test_feature_names_wavelet_coef_energy(wavelet_name='db4'):
@@ -357,7 +357,7 @@ def test_feature_names_wavelet_coef_energy(wavelet_name='db4'):
         _data, sfreq, selected_funcs,
         funcs_params={'wavelet_coef_energy__wavelet_name': wavelet_name},
         return_as_df=True)
-    assert_equal(df.columns.get_level_values(1).values, col_names)
+    assert_equal(df.columns.get_level_values(1).to_list(), col_names)
 
 
 def test_feature_names_teager_kaiser_energy(wavelet_name='db4'):
@@ -376,7 +376,7 @@ def test_feature_names_teager_kaiser_energy(wavelet_name='db4'):
         _data, sfreq, selected_funcs,
         funcs_params={'teager_kaiser_energy__wavelet_name': wavelet_name},
         return_as_df=True)
-    assert_equal(df.columns.get_level_values(1).values, col_names)
+    assert_equal(df.columns.get_level_values(1).to_list(), col_names)
 
 
 def test_feature_names_pow_freq_bands():
@@ -402,7 +402,9 @@ def test_feature_names_pow_freq_bands():
             funcs_params={'pow_freq_bands__ratios': 'only',
                           'pow_freq_bands__freq_bands': fb},
             return_as_df=True)
-        assert_equal(df_only.columns.get_level_values(1).values, ratios_names)
+        assert_equal(
+            df_only.columns.get_level_values(1).to_list(), ratios_names
+        )
 
         # With `ratios = 'all'`:
         df_all = extract_features(
@@ -410,7 +412,7 @@ def test_feature_names_pow_freq_bands():
             funcs_params={'pow_freq_bands__ratios': 'all',
                           'pow_freq_bands__freq_bands': fb},
             return_as_df=True)
-        assert_equal(df_all.columns.get_level_values(1).values,
+        assert_equal(df_all.columns.get_level_values(1).to_list(),
                      pow_names + ratios_names)
 
         # With `ratios = None`:
@@ -419,7 +421,7 @@ def test_feature_names_pow_freq_bands():
             funcs_params={'pow_freq_bands__ratios': None,
                           'pow_freq_bands__freq_bands': fb},
             return_as_df=True)
-        assert_equal(df.columns.get_level_values(1).values, pow_names)
+        assert_equal(df.columns.get_level_values(1).to_list(), pow_names)
 
         # With `ratios = 'only'` and `ratios_triu = True`:
         df_only = extract_features(
@@ -428,7 +430,7 @@ def test_feature_names_pow_freq_bands():
                           'pow_freq_bands__ratios_triu': True,
                           'pow_freq_bands__freq_bands': fb},
             return_as_df=True)
-        assert_equal(df_only.columns.get_level_values(1).values,
+        assert_equal(df_only.columns.get_level_values(1).to_list(),
                      ratios_names[::2])
 
 
@@ -531,7 +533,7 @@ def test_feature_names_energy_freq_bands():
             _data, sfreq, selected_funcs,
             funcs_params={'energy_freq_bands__freq_bands': fb},
             return_as_df=True)
-        assert_equal(df.columns.get_level_values(1).values, feat_names)
+        assert_equal(df.columns.get_level_values(1).to_list(), feat_names)
 
 
 def test_spect_slope():
